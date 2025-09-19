@@ -25,6 +25,7 @@
 from __future__ import division, absolute_import, with_statement, print_function, unicode_literals
 from renpy.compat import PY2, basestring, bchr, bord, chr, open, pystr, range, round, str, tobytes, unicode  # *
 
+import pygame_sdl2
 import renpy
 import _renpy
 
@@ -145,7 +146,7 @@ def linmap(src, dst, rmap, gmap, bmap, amap):
 save_png = _renpy.save_png
 
 
-def map(src, dst, rmap, gmap, bmap, amap):
+def map(src, dst, rmap, gmap, bmap, amap):  # @ReservedAssignment
     """
     This maps the colors between two surfaces. The various map
     parameters must be 256 character long strings, with the value
@@ -156,7 +157,7 @@ def map(src, dst, rmap, gmap, bmap, amap):
     convert_and_call(_renpy.map, src, dst, *endian_order(dst, rmap, gmap, bmap, amap))
 
 
-def blur(src, wrk, dst, xrad, yrad=None):
+def blur(src, wrk, dst, xrad, yrad=None):  # @ReservedAssignment
     """
     This blurs the source surface. It approximates a Gaussian blur
     using several box blurs with box sizes based on the desired
