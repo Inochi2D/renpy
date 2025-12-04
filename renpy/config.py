@@ -99,15 +99,6 @@ image_cache_size = None
 # The size of the image cache, in megabytes.
 image_cache_size_mb = 400
 
-# The number of threads to use for parallel image decoding during preloading.
-# Set to 0 for automatic (based on CPU count, capped as below and always leaving
-# at least 2 free) or 1 to disable parallel decoding.
-preload_threads = 0
-
-# The maximum number of threads to use for preloading when the above is
-# set to automatic.
-preload_thread_autocap = 4
-
 # The number of statements we will analyze when doing predictive
 # loading. Please note that this is a total number of statements in a
 # BFS along all paths, rather than the depth along any particular
@@ -1636,7 +1627,7 @@ extend_like_characters: set[str] = { "extend" }
 A set of character names that will be treated like the "extend" character for the purpose of dialogue export.
 """
 
-tlid_only_considers_say: bool = True
+tlid_only_considers_say: bool = False
 """
 If True, only say statements will be assigned translation ids.
 """
