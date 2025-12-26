@@ -938,16 +938,12 @@ class RollbackLog(renpy.object.Object):
 
         # If we have exceeded the rollback limit, and don't have force,
         # give up.
-
-        if not self.can_rollback(checkpoints, force):
+        if checkpoints and (self.rollback_limit <= 0) and (not force):
             return
 
-        raise RollbackException(checkpoints, label, greedy, on_load, abnormal, current_label)
+        raise RollbackException(self, checkpoints, label, greedy, on_load, abnormal, current_label)
 
     def rollback_core(self, checkpoints, label=None, greedy=True, on_load=False, abnormal=True, current_label=None):
-
-        if not on_load:
-            self.complete(False)
 
         self.purge_unreachable(self.get_roots())
 
@@ -955,7 +951,6 @@ class RollbackLog(renpy.object.Object):
 
         # Find the place to roll back to.
         while self.log:
-
             rb = self.log.pop()
             revlog.append(rb)
 
@@ -980,6 +975,8 @@ class RollbackLog(renpy.object.Object):
 
             if on_load:
                 self.load_failed()
+            else:
+                print("Can't find a place to rollback to. Not rolling back.")
 
             return
 
@@ -1100,10 +1097,6 @@ class RollbackLog(renpy.object.Object):
         after rollback has finished, if it exists.
         """
 
-        if not self.can_rollback(0, True):
-            if not renpy.config.load_failed_label:
-                raise Exception("Could not load the game. Perhaps the script changed in an incompatible way.")
-
         raise UnfreezeException(self, roots, label)
 
     def unfreeze_core(self, roots, label=None):
@@ -1183,14 +1176,14 @@ class UnfreezeException(BaseException):
     unfreeze from a saved state.
     """
 
-    def __init__(self, log: RollbackLog, roots: dict[str, Any]|None=None, label: str|None=None):
+    def __init__(self, log: RollbackLog, roots: dict[str, renpy.python.StoreDict]|None=None, label: str|None=None):
         super().__init__()
         self.log: RollbackLog = log
-        self.roots: dict[str, Any]|None = roots
+        self.roots: dict[str, renpy.python.StoreDict]|None = roots
         self.label: str|None = label
 
     def perform_unfreeze(self):
-        self.log.unfreeze_core(self.roots, self.label)
+        renpy.game.log.unfreeze_core(self.roots)
 
 
 class RollbackException(BaseException):
