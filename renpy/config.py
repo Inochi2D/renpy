@@ -1637,12 +1637,6 @@ safe_text: bool = False
 If True, invalid text is displayed. If False, it's ignored.
 """
 
-special_directory_map: dict[str, list[str]] = { 'images' : [ 'images' ], 'audio' : [ 'audio' ], 'fonts' : [ 'fonts' ] }
-"""
-This maps the special directory names ('images', 'audio', 'fonts') to a list of directories that will
-be searched for that kind of file.
-"""
-
 
 del os
 del collections
