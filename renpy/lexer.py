@@ -216,7 +216,19 @@ def unelide_filename(fn: str) -> str:
 
 def get_string_munger(prefix: str) -> Callable[[str], str]:
     if renpy.config.munge_in_strings:
-        return functools.partial(re.sub, NEED_MUNGE_PATTERN, rf"{prefix}\1")
+
+        def munge_string(m: re.Match[str]):
+            g1 = m.group(1)
+
+            if "__" in g1:
+                return m.group(0)
+
+            if g1.startswith("_"):
+                return m.group(0)
+
+            return prefix + m.group(1)
+
+        return functools.partial(re.sub, r"\b__(\w+)", munge_string)
 
     else:
 
@@ -237,11 +249,61 @@ def get_string_munger(prefix: str) -> Callable[[str], str]:
 # The filename that the start and end positions are relative to.
 original_filename = ""
 
-# Matches any amount of blank lines, comment-only lines, and backslash-newlines.
-IGNORE_PATTERN = re.compile(r"(?:\ *+(?:#[^\n]*+)?(?:\\)?\n)*+")
+# Matches one operator that contains special characters.
+ANY_OPERATOR_REGEX = re.compile(
+    "|".join(
+        re.escape(i)
+        for i in (
+            "//=",
+            ">>=",
+            "<<=",
+            "**=",
+            "+=",
+            "-=",
+            "*=",
+            "/=",
+            "%=",
+            "@=",
+            "&=",
+            "|=",
+            "^=",
+            "//",
+            ">>",
+            "<<",
+            "**",
+            "+",
+            "-",
+            "*",
+            "/",
+            "%",
+            "@",
+            "&",
+            "|",
+            "^",
+            ":=",
+            "<=",
+            ">=",
+            "<>",
+            "==",
+            "->",
+            "!=",
+            ",",
+            ":",
+            "!",
+            ".",
+            ";",
+            "=",
+            "~",
+            "<",
+            ">",
+            "$",
+            "?",
+        )
+    )
+)
 
-# Matches a word that should be munged.
-NEED_MUNGE_PATTERN = re.compile(r"\b__([a-zA-Z0-9\u0080-\U0010FFFF]+(?:_[a-zA-Z0-9\u0080-\U0010FFFF]+)*_?)\b")
+# Matches any amount of blank lines, comment-only lines, and backslash-newlines.
+IGNORE_REGEX = re.compile(r"""(?:\ *\n|\ *\#[^\n]*\n|\ *\\\n)*""")
 
 
 def list_logical_lines(
@@ -258,7 +320,7 @@ def list_logical_lines(
     contents. In that case, `filename` need not exist.
     """
 
-    from renpy.lexersupport import match_logical_word, match_operator, match_string, match_whitespace
+    from renpy.lexersupport import match_logical_word
 
     global original_filename
 
@@ -309,16 +371,12 @@ def list_logical_lines(
     open_parens: list[tuple[str, int, int]] = []
 
     # Position at the beginning of current physical line.
-    # This is used to calculate current column offset by pos - physical_line_start.
-    physical_line_start = pos
+    # This is used to calculate current column offset by pos - line_startpos.
+    line_startpos = pos
 
-    # Put some frequently used variables in locals.
-    ignore_pattern = IGNORE_PATTERN
-    need_munge_pattern = NEED_MUNGE_PATTERN
+    ignore_regex = IGNORE_REGEX
 
-    # Position at which last append to current line happened.
-    # This is used to speed up join later as there would be less parts to join.
-    last_append_pos = pos
+    operator_regex = ANY_OPERATOR_REGEX
 
     # True if we are at the start of a new logical line.
     new_logical_line = True
@@ -326,101 +384,113 @@ def list_logical_lines(
     # Looping over whole file to find logical lines.
     while pos < len_data:
         if new_logical_line:
-            if match := ignore_pattern.match(data, pos):
+            if match := ignore_regex.match(data, pos):
                 pos = match.end()
                 number += match[0].count("\n")
 
             start_number = number
-            physical_line_start = pos
-            last_append_pos = pos
+            line_startpos = pos
             line.clear()
             new_logical_line = False
             continue
 
         # Looping over parts of single logical line.
-
-        # Most tokens are split by spaces, so just skip over them.
-        # That includes initial indent.
-        if spaces_pos := match_whitespace(data, pos):
-            pos = spaces_pos
-
-        # Words, i.e. number parts, identifiers or image name components are
-        # the most frequent tokens, so we want to try to match them first.
-        word_pos = match_logical_word(data, pos)
-
-        # But string prefixes are valid words, so check if we have a
-        # string literal here.
-        if string_match := match_string(data, pos, word_pos or pos):
-            if string_match == -1:
-                raise ParseError(
-                    "unterminated string literal",
-                    filename,
-                    start_number,
-                    text=linecache.getline(filename, start_number),
-                )
-
-            (
-                string_endpos,
-                need_munge,
-                newlines,
-                new_line_startpos,
-            ) = string_match
-
-            if newlines:
-                number += newlines
-
-            if new_line_startpos is not None:
-                physical_line_start = new_line_startpos
-
-            if need_munge:
-                # There is `__` in a string.
-                line.append(data[last_append_pos:pos])
-                line.append(munge_string(data[pos:string_endpos]))
-                last_append_pos = pos = string_endpos
-            else:
-                pos = string_endpos
-
-            continue
-
-        elif word_pos is not None:
-            if data[pos] == "_" and (m := need_munge_pattern.match(data, pos)):
-                line.append(data[last_append_pos:pos])
-                line.append(f"{prefix}{m[1]}")
-                last_append_pos = pos = word_pos
-
-            else:
-                pos = word_pos
-
-            continue
-
         c = data[pos]
 
-        # Comments.
-        if c == "#":
-            # Comments should not appear in final line so user don't have to
-            # worry about them using regexes.
-            line.append(data[last_append_pos:pos])
-            pos = data.find("\n", pos)
-            if pos == -1:
-                pos = len_data
+        # Name and runs of spaces are the most common cases, so it's first.
+        if c in " _" or c.isalnum():
+            word, magic, end = match_logical_word(data, pos)
 
-            last_append_pos = pos
-            c = "\n"
+            if magic and word[2] != "_":
+                rest = word[2:]
+
+                if "__" not in rest:
+                    word = prefix + rest
+
+            line.append(word)
+            pos = end
+            continue
+
+        # Strings are second common case.
+        if c in "\"'`":
+            string_startpos = pos
+
+            # Compute quote size.
+            if data[pos + 1] == c:
+                if data[pos + 2] == c:
+                    pos += 3
+                    quote_size = 3
+                else:
+                    # Empty string.
+                    pos += 2
+                    line.append(f"{c}{c}")
+                    continue
+            else:
+                pos += 1
+                quote_size = 1
+
+            quote = c
+
+            end_quote_size = 0
+            c = data[pos]
+            while end_quote_size != quote_size:
+                # Skip escaped char.
+                while c == "\\":
+                    end_quote_size = 0
+                    pos += 2
+                    c = data[pos]
+
+                pos += 1
+
+                if c == "\n":
+                    end_quote_size = 0
+                    line_startpos = pos
+                    number += 1
+
+                elif c == quote:
+                    end_quote_size += 1
+                else:
+                    end_quote_size = 0
+
+                # TODO: disallow same quote nested f-strings.
+
+                try:
+                    c = data[pos]
+                except IndexError:
+                    raise ParseError(
+                        "unterminated string literal",
+                        filename,
+                        start_number,
+                        text=linecache.getline(filename, start_number),
+                    )
+
+            s = data[string_startpos:pos]
+            if "__" in s:
+                s = munge_string(s)
+
+            line.append(s)
+
+            continue
+
+        # Operator.
+        if match := operator_regex.match(data, pos):
+            line.append(match[0])
+            pos = match.end()
+            continue
 
         # Newline.
         if c == "\n":
             if open_parens:
+                line.append("\n")
                 pos += 1
                 number += 1
-                physical_line_start = pos
+                line_startpos = pos
                 continue
-
-            if last_append_pos != pos:
-                line.append(data[last_append_pos:pos])
 
             rv_line = "".join(line)
 
-            assert rv_line.strip(), f"Got empty logical line in {filename}:{start_number}:{physical_line_start}."
+            if not rv_line.strip():
+                raise Exception(f"{filename}:{start_number}:{line_startpos} empty line")
 
             # Add to the results.
             result.append((filename, start_number, rv_line))
@@ -429,7 +499,8 @@ def list_logical_lines(
 
         # Parenthesis.
         if c in "([{":
-            open_parens.append((c, number, pos - physical_line_start))
+            open_parens.append((c, number, pos - line_startpos))
+            line.append(c)
             pos += 1
             continue
 
@@ -439,7 +510,7 @@ def list_logical_lines(
                     f"unmatched '{c}'",
                     filename,
                     number,
-                    pos - physical_line_start + 1,
+                    pos - line_startpos + 1,
                     linecache.getline(filename, number),
                 )
 
@@ -450,49 +521,39 @@ def list_logical_lines(
                     f"closing parenthesis '{c}' does not match opening parenthesis '{open_c}'",
                     filename,
                     number,
-                    pos - physical_line_start + 1,
+                    pos - line_startpos + 1,
                     linecache.getline(filename, number),
                 )
 
+            line.append(c)
             pos += 1
             continue
 
-        # Operator.
-        if op_pos := match_operator(data, pos):
-            pos = op_pos
+        # Comments.
+        if c == "#":
+            pos = data.index("\n", pos)
             continue
 
         # Backslash/newline.
-        if c == "\\":
-            if data[pos + 1] != "\n":
-                raise ParseError(
-                    "unexpected character after line continuation character.",
-                    filename,
-                    number,
-                    pos - physical_line_start + 1,
-                    text=linecache.getline(filename, number),
-                )
-
-            physical_line_start = pos
-            number += 1
+        if c == "\\" and data[pos + 1] == "\n":
             pos += 2
+            number += 1
+            line_startpos = pos
+            line.append("\\\n")
             continue
 
-        assert ord(c) < 32 or ord(c) == 127, f"Got printable character {c!r} at {pos} in {filename}."
-
         if c == "\t":
-            name = "Tab character"
+            raise ParseError(
+                "Tab characters are not allowed in Ren'Py scripts.",
+                filename,
+                number,
+                text=linecache.getline(filename, number),
+            )
 
-        # Some kind of non alpha-numeric character in ASCII range.
+        # Some kind of non alpha-numeric character outside of ASCII range.
         else:
-            name = f"ASCII control character '{c}'"
-
-        raise ParseError(
-            f"{name} is not allowed in Ren'Py scripts.",
-            filename,
-            number,
-            text=linecache.getline(filename, number),
-        )
+            line.append(c)
+            pos += 1
 
     if open_parens:
         c, lineno, column = open_parens[-1]
@@ -562,13 +623,7 @@ def group_logical_lines(lines: list[tuple[str, int, str]]) -> list[GroupedLine]:
                 stack.pop()
 
             else:
-                raise ParseError(
-                    "unindent does not match any outer indentation level",
-                    filename,
-                    number,
-                    indent + 1,
-                    rest,
-                )
+                raise ParseError("Indentation mismatch.", filename, number, text=text)
 
         block.append(GroupedLine(filename, number, indent, rest, []))
 
@@ -685,11 +740,11 @@ class Lexer(object):
 
         # These are set by advance.
         self.filename = ""
-        self.text: str = ""
+        self.text = ""
         self.number = 0
         self.subblock = []
         self.global_label = global_label
-        self.pos: int = 0
+        self.pos = 0
         self.word_cache_pos = -1
         self.word_cache_newpos = -1
         self.word_cache = ""
@@ -749,7 +804,7 @@ class Lexer(object):
         if self.eob:
             return None
 
-        if self.pos >= len(self.text):
+        if self.pos == len(self.text):
             return None
 
         m = re.compile(regexp, re.DOTALL).match(self.text, self.pos)
@@ -766,36 +821,7 @@ class Lexer(object):
         Advances the current position beyond any contiguous whitespace.
         """
 
-        pos = self.pos
-        text = self.text
-        text_len = len(text)
-
-        if pos >= text_len:
-            return
-
-        if text[pos] not in " \\\n":
-            return
-
-        from renpy.lexersupport import match_whitespace
-
-        try:
-            while pos < text_len:
-                if spaces_pos := match_whitespace(text, pos):
-                    pos = spaces_pos
-
-                elif text[pos] == "\n":
-                    pos += 1
-
-                elif text[pos] == "\\" and text[pos + 1] == "\n":
-                    pos += 2
-
-                else:
-                    break
-
-            self.pos = pos
-
-        except IndexError:
-            self.pos = text_len
+        self.match_regexp(r"(\s+|\\\n)+")
 
     def match(self, regexp):
         """
@@ -1114,21 +1140,8 @@ class Lexer(object):
             self.pos = self.word_cache_newpos
             return self.word_cache
 
-        from renpy.lexersupport import match_logical_word
-
         self.word_cache_pos = self.pos
-
-        self.skip_whitespace()
-
-        if new_pos := match_logical_word(self.text, self.pos):
-            rv = self.text[self.pos : new_pos]
-            if rv.isidentifier():
-                self.pos = new_pos
-            else:
-                rv = None
-        else:
-            rv = None
-
+        rv = self.match(word_regexp)
         self.word_cache = rv
         self.word_cache_newpos = self.pos
 
@@ -1230,26 +1243,32 @@ class Lexer(object):
         if self.eol():
             return False
 
-        start_pos = self.pos
+        old_pos = self.pos
 
-        from renpy.lexersupport import match_string, match_logical_word
+        # Delimiter.
+        start = self.match(r'[urfURF]*("""|\'\'\'|"|\')')
 
-        delim_pos = match_logical_word(self.text, start_pos)
-
-        if (delim_pos or start_pos) >= len(self.text):
+        if not start:
+            self.pos = old_pos
             return None
 
-        # match_string would match backtick string otherwise.
-        if self.text[delim_pos or start_pos] not in "\"'":
-            return None
+        delim = start.lstrip("urfURF")
 
-        if m := match_string(self.text, self.pos, delim_pos or start_pos):
-            if m == -1:
+        # String contents.
+        while True:
+            if self.eol():
                 self.error("end of line reached while parsing string.")
 
-            self.pos = m[0]
+            if self.match(delim):
+                break
 
-        return self.text[start_pos : self.pos]
+            if self.match(r"\\"):
+                self.pos += 1
+                continue
+
+            self.match(r'.[^\'"\\]*')
+
+        return self.text[old_pos : self.pos]
 
     def dotted_name(self):
         """
@@ -1309,7 +1328,8 @@ class Lexer(object):
             if c in delim:
                 return self.expr(self.text[start : self.pos], expr)
 
-            if self.python_string():
+            if c in "'\"":
+                self.python_string()
                 continue
 
             if self.parenthesised_python():
