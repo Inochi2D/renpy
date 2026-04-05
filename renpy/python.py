@@ -23,31 +23,37 @@
 # contained within the script file. It also handles rolling back the
 # game state to some time in the past.
 
-# Import the future module itself.
-import __future__
+from __future__ import division, absolute_import, with_statement, print_function, unicode_literals
+from renpy.compat import PY2, basestring, bchr, bord, chr, open, pystr, range, round, str, tobytes, unicode  # *
+
+from typing import Optional, Any
+import contextlib
 
 # Import the python ast module, not ours.
 import ast
+
+# Import the future module itself.
+import __future__
+
 import collections
-import contextlib
-import copyreg
-import importlib.util
 import marshal
-import os
-import sys
-import types
-import warnings
+import random
 import weakref
-import zlib
-from typing import Any, Final, Literal
+import re
+import sys
+import time
+import io
+import types
+import copyreg
+import functools
+import warnings
 
 import renpy
+
 from renpy.astsupport import hash32
-from renpy.compat.pickle import dumps, loads
-from renpy.pydict import DictItems, find_changes
 
 # Import these for pickle-compatibility.
-from renpy.revertable import (  # noqa: F401
+from renpy.revertable import (
     CompressedList,
     DetRandom,
     RevertableDict,
@@ -58,18 +64,20 @@ from renpy.revertable import (  # noqa: F401
     revertable_range,
     revertable_sorted,
 )
-from renpy.rollback import (  # noqa: F401
+
+from renpy.rollback import (
+    deleted,
+    StoreDeleted,
     AlwaysRollback,
     NoRollback,
-    Rollback,
-    RollbackLog,
     SlottedNoRollback,
-    StoreDeleted,
-    deleted,
+    rng,
     reached,
     reached_vars,
-    rng,
+    Rollback,
+    RollbackLog,
 )
+
 
 ##############################################################################
 # Code that implements the store.
@@ -101,6 +109,9 @@ class StoreModule(object):
 
 def get_store_module(name):
     return sys.modules[name]
+
+
+from renpy.pydict import DictItems, find_changes
 
 
 class StoreDict(dict):
@@ -206,7 +217,7 @@ store_modules = {}
 initialized_store_dicts = set()
 
 
-def create_store(name):
+def create_store(name: str):
     """
     Creates the store with `name`.
     """
@@ -218,8 +229,10 @@ def create_store(name):
 
     if parent:
         create_store(parent)
-
-    name = str(name)
+        package = parent
+    else:
+        package = "store"
+        parent = "store"
 
     if name in initialized_store_dicts:
         return
@@ -230,8 +243,8 @@ def create_store(name):
     d = store_dicts.setdefault(name, StoreDict())
     d.reset()
 
-    # Set the name.
-    d.update(__name__=name, __package__=name)
+    # Set up the contents of a normal module.
+    d.update(__name__=name, __package__=package, __loader__=None, __spec__=None, __path__=None)
 
     # Set up the default contents of the store.
     eval("1", d)
@@ -253,6 +266,9 @@ def create_store(name):
 
     if parent:
         store_dicts[parent][var] = sys.modules[name]
+
+        # Make sure the parent is a package. (In the case of store, it's its own parent, so always is a package.)
+        store_dicts[parent].update(__path__=[], __package__=parent)
 
 
 class StoreBackup:
@@ -298,7 +314,7 @@ class StoreBackup:
             self.restore_one(k)
 
 
-clean_store_backup: StoreBackup | None = None
+clean_store_backup = None  # type: Optional[StoreBackup]
 
 
 def make_clean_stores():
@@ -320,7 +336,7 @@ def clean_stores():
     Revert the store to the clean copy.
     """
 
-    clean_store_backup.restore()
+    clean_store_backup.restore()  # type: ignore
 
 
 def clean_store(name):
@@ -331,7 +347,7 @@ def clean_store(name):
     if not name.startswith("store."):
         name = "store." + name
 
-    clean_store_backup.restore_one(name)
+    clean_store_backup.restore_one(name)  # type: ignore
 
 
 def reset_store_changes(name):
@@ -357,6 +373,7 @@ def mark_changed(name: str, variable: str):
 
 
 # Code that replaces literals will calls to magic constructors.
+
 class LoadedVariables(ast.NodeVisitor):
     """
     This is used to implement find_loaded_variables.
@@ -722,7 +739,7 @@ class WrapNode(ast.NodeTransformer):
         if not names:
             return node
 
-        rv: list[ast.AST] = [node]
+        rv = [node]
 
         args = []
 
@@ -768,6 +785,42 @@ _execute_python_hide()
     tree.body = hide.body
 
 
+unicode_re = re.compile(r"[\u0080-\uffff]")
+
+
+def unicode_sub(m):
+    """
+    If the string s contains a unicode character, make it into a
+    unicode string.
+    """
+
+    s = m.group(0)
+
+    if not unicode_re.search(s):
+        return s
+
+    prefix = m.group(1)
+    sep = m.group(2)
+    body = m.group(3)
+
+    if "u" not in prefix and "U" not in prefix:
+        prefix = "u" + prefix
+
+    rv = prefix + sep + body + sep
+
+    return rv
+
+
+string_re = re.compile(r'([uU]?[rR]?)("""|"|\'\'\'|\')((\\.|.)*?)\2')
+
+
+def escape_unicode(s):
+    if unicode_re.search(s):
+        s = string_re.sub(unicode_sub, s)
+
+    return s
+
+
 # A list of warnings that were issued during compilation.
 compile_warnings = []
 
@@ -796,175 +849,24 @@ def save_warnings():
         warnings.showwarning = old
 
 
-type CompileMode = Literal["eval", "exec", "hide"]
+# Flags used by py_compile.
+old_compile_flags = __future__.nested_scopes.compiler_flag | __future__.with_statement.compiler_flag
 
-
-class CompileCache:
-    """
-    This class holds the cache for the results of py_compile.
-
-    This has two levels of cache:
-    - The first level is a cache from cache key to the bytecode.
-    - The second level is a cache from cache key to marshaled bytecode.
-
-    Second level cache is stored in bytecode.rpyb file, while the first level
-    cache is computed from the second level cache for each run.
-
-    Futhermore, each cache is also split into old and new generations that are
-    swapped every utter_restart.
-    """
-
-    BYTECODE_VERSION = 1
-    "The version of the bytecode cache."
-
-    OLD_BYTECODE_FILE: Final = "cache/bytecode.rpyb"
-    "The name of bytecode cache file before Ren'Py 8."
-
-    BYTECODE_FILE: Final = f"cache/bytecode-{sys.version_info.major}{sys.version_info.minor}.rpyb"
-    "The name of bytecode cache file used to store the bytecode cache."
-
-    # Change this to force a recompile of Python when required.
-    MAGIC_NUMBER: Final = importlib.util.MAGIC_NUMBER + b"_2025-06-16"
-    "Magic number used to invalidate the bytecode cache that is invalid for the current version of Ren'Py."
-
-    type ItemKey = tuple[
-        int,  # hashcode
-        int,  # lineno
-        str,  # filename
-        CompileMode,  # mode
-        int,  # flags
-        int,  # column
-    ]
-
-    type CacheKey = tuple[
-        int,  # hashcode
-        int,  # lineno
-        str,  # filename
-        CompileMode,  # mode
-        bytes,  # MAGIC_NUMBER
-        int,  # flags
-        int,  # column
-    ]
-
-    type WarningsKey = tuple[Literal["warnings"], CacheKey]
-
-    type LiteralValue = tuple[Literal["literal"], Any]
-
-    def __init__(self):
-        self.old_compile_cache: dict[CompileCache.CacheKey, types.CodeType | CompileCache.LiteralValue] = {}
-        self.new_compile_cache: dict[CompileCache.CacheKey, types.CodeType | CompileCache.LiteralValue] = {}
-
-        self.old_bytecode_cache: dict[CompileCache.CacheKey, bytes] = {}
-        self.new_bytecode_cache: dict[CompileCache.CacheKey, bytes] = {}
-
-        self.warnings: dict[CompileCache.WarningsKey, list[tuple[str, int, str]]] = {}
-        "A map of warnings key to a list of (filename, linenumber, warning) tuples generated for that key."
-
-        self.bytecode_dirty = False
-        "True if bytecode has been modified and needs to be saved."
-
-    def load(self):
-        """
-        Loads the bytecode cache.
-        """
-
-        if renpy.game.args.compile_python:
-            return
-
-        try:
-            with renpy.loader.load(CompileCache.BYTECODE_FILE) as f:
-                version, cache = loads(zlib.decompress(f.read()))
-                if version == CompileCache.BYTECODE_VERSION:
-                    self.old_compile_cache = {k: v for k, v in cache.items() if k[0] != "warnings"}
-                    self.warnings = {k: v for k, v in cache.items() if k[0] == "warnings"}
-        except Exception:
-            pass
-
-    def save(self):
-        """
-        Saves the bytecode cache.
-        """
-
-        if renpy.macapp:
-            return
-
-        if not self.bytecode_dirty:
-            return
-
-        try:
-            fn = renpy.loader.get_path(CompileCache.BYTECODE_FILE)
-
-            with open(fn, "wb") as f:
-                data = (
-                    CompileCache.BYTECODE_VERSION,
-                    self.new_bytecode_cache | self.warnings,
-                )
-                f.write(zlib.compress(dumps(data), 3))
-        except Exception:
-            pass
-
-        fn = renpy.loader.get_path(CompileCache.OLD_BYTECODE_FILE)
-        try:
-            os.unlink(fn)
-        except Exception:
-            pass
-
-    def reload(self):
-        self.old_compile_cache = self.new_compile_cache
-        self.new_compile_cache = {}
-
-        self.old_bytecode_cache = self.new_bytecode_cache
-        self.new_bytecode_cache = {}
-
-        self.bytecode_dirty = True
-
-    def get(self, item_key: ItemKey) -> types.CodeType | LiteralValue | None:
-        hashcode, lineno, filename, mode, flags, column = item_key
-        key = (hashcode, lineno, filename, mode, CompileCache.MAGIC_NUMBER, flags, column)
-
-        if rv := self.new_compile_cache.get(key):
-            return rv
-
-        if rv := self.old_compile_cache.get(key):
-            self.new_compile_cache[key] = rv
-
-            if key not in self.new_bytecode_cache:
-                self.new_bytecode_cache[key] = marshal.dumps(rv)
-
-            return rv
-
-        if bytecode := self.old_bytecode_cache.get(key):
-            try:
-                rv = marshal.loads(bytecode)
-                self.new_compile_cache[key] = rv
-                self.new_bytecode_cache[key] = bytecode
-
-                return rv
-            except Exception:
-                pass
-
-        return None
-
-    def put(
-        self,
-        item_key: ItemKey,
-        value: types.CodeType | LiteralValue,
-        warnings: list[tuple[str, int, str]],
-    ):
-        hashcode, lineno, filename, mode, flags, column = item_key
-        key = (hashcode, lineno, filename, mode, CompileCache.MAGIC_NUMBER, flags, column)
-
-        self.new_compile_cache[key] = value
-        self.new_bytecode_cache[key] = marshal.dumps(value)
-        if warnings:
-            self.warnings["warnings", key] = warnings
-        self.bytecode_dirty = True
-
-
-compile_cache = CompileCache()
+new_compile_flags = (
+    old_compile_flags
+    | __future__.absolute_import.compiler_flag
+    | __future__.print_function.compiler_flag
+    | __future__.unicode_literals.compiler_flag
+)
 
 # A set of __future__ flag overrides for each file.
 file_compiler_flags = collections.defaultdict(int)
+
+# A cache for the results of py_compile.
+py_compile_cache = {}
+
+# An old version of the same, that's preserved across reloads.
+old_py_compile_cache = {}
 
 
 class LocationFixer:
@@ -1000,7 +902,7 @@ class LocationFixer:
 
         self.fix(node, 1 + line_delta, first_line_col_delta)
 
-    def fix(self, node: Any, lineno: int, col_offset: int):
+    def fix(self, node: ast.stmt, lineno: int, col_offset: int):
         # Not all nodes have location attributes, e.g. expr_context.
         # But it's either none of them, or all 4 of them.
         if "lineno" not in node._attributes:
@@ -1041,7 +943,7 @@ class LocationFixer:
 
             # Not all children may have end location attributes.
             if "lineno" in c._attributes:
-                if end < (c_end := (c.end_lineno, c.end_col_offset)):  # type: ignore
+                if end < (c_end := (c.end_lineno, c.end_col_offset)):
                     end = c_end
 
         node.end_lineno, node.end_col_offset = end
@@ -1220,10 +1122,42 @@ def py_compile(source, mode, filename="<none>", lineno=1, ast_node=False, cache=
     if renpy.config.future_annotations:
         flags |= __future__.annotations.compiler_flag
 
-    key = (hashcode, lineno, filename, mode, flags, column)
     if cache:
-        if rv := compile_cache.get(key):
+        key = (hashcode, lineno, filename, mode, renpy.script.PYC_MAGIC, flags, column)
+        warnings_key = ("warnings", key)
+
+        rv = py_compile_cache.get(key, None)
+        if rv is not None:
             return rv
+
+        rv = old_py_compile_cache.get(key, None)
+        if rv is not None:
+            py_compile_cache[key] = rv
+
+            return rv
+
+        bytecode = renpy.game.script.bytecode_oldcache.get(key, None)
+
+        if bytecode is not None:
+            try:
+                rv = marshal.loads(bytecode)
+                py_compile_cache[key] = rv
+
+                renpy.game.script.bytecode_newcache[key] = bytecode
+
+                if warnings_key in renpy.game.script.bytecode_oldcache:
+                    renpy.game.script.bytecode_newcache[warnings_key] = renpy.game.script.bytecode_oldcache[
+                        warnings_key
+                    ]
+
+                return rv
+
+            except Exception:
+                pass
+
+    else:
+        warnings_key = None
+        key = None
 
     source = str(source)
     source = source.replace("\r", "")
@@ -1234,8 +1168,11 @@ def py_compile(source, mode, filename="<none>", lineno=1, ast_node=False, cache=
             rv = ast.literal_eval(source)
             if is_immutable_value(rv):
                 rv = ("literal", rv)
-                compile_cache.put(key, rv, [])
+                py_compile_cache[key] = rv
+                renpy.game.script.bytecode_newcache[key] = marshal.dumps(rv)
+
                 return rv
+
         except Exception:
             pass
 
@@ -1301,8 +1238,15 @@ def py_compile(source, mode, filename="<none>", lineno=1, ast_node=False, cache=
                     raise
 
         if cache:
-            compile_cache.put(key, rv, compile_warnings)
-            compile_warnings = []
+            py_compile_cache[key] = rv
+
+            renpy.game.script.bytecode_newcache[key] = marshal.dumps(rv)
+
+            if compile_warnings:
+                renpy.game.script.bytecode_newcache[warnings_key] = compile_warnings
+                compile_warnings = []
+
+            renpy.game.script.bytecode_dirty = True
 
         return rv
 
@@ -1430,8 +1374,4 @@ def construct_None(*args):
     return None
 
 
-def pickle_weakref(r):
-    return (construct_None, ())
-
-
-copyreg.pickle(weakref.ReferenceType, pickle_weakref)
+copyreg.pickle(weakref.ReferenceType, lambda r: (construct_None, tuple()))
