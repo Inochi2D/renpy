@@ -1553,7 +1553,7 @@ class Interface:
             return None
 
         start = self.transition_time.get(layer, self.frame_time) or self.frame_time
-        delay = getattr(transition, "delay", 0) or 0
+        delay = getattr(transition, "delay", 0)
 
         if (self.frame_time - start) < delay:
             return rv
@@ -2965,7 +2965,7 @@ class Interface:
                                 pass
                             pygame.time.set_timer(REDRAW, 0)
                         else:
-                            pygame.time.set_timer(REDRAW, max(int(time_left * 1000), 1), once=True)
+                            pygame.time.set_timer(REDRAW, max(int(time_left * 1000), 1))
 
                 elif redraw_time is None:
 
