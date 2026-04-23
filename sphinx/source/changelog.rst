@@ -66,6 +66,12 @@ Ren'Py's PC presplash system has been updated to support WEBP and AVIF images, i
 8.5.3
 =====
 
+Dependency Updates
+------------------
+
+Ren'Py now supports and requires Live2D 5.3. You may need to update Live2D to continue to use it in Ren'Py 5.3.
+
+
 Ren'Py Stores as Python Packages
 --------------------------------
 

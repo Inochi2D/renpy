@@ -34,6 +34,14 @@ back, add::
 
     define config.tlid_only_considers_say = False
 
+.. _incompatible-8.5.3:
+
+8.5.3
+-----
+
+**Live2D** Ren'Py now supports and requires Live2D 5.3. You may need to update Live2D to continue to use it in Ren'Py 5.3.
+
+
 .. _incompatible-8.5.0:
 
 8.5.0
