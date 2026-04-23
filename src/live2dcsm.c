@@ -482,7 +482,7 @@ static csmModel* csmInitializeModelInPlace(const csmMoc* moc, void* address, con
     proxy->renpy_drawable_dynamic_flags = (const csmFlags *) pointerFromLive2d(proxy, proxy->live2d_drawable_dynamic_flags);
     proxy->renpy_drawable_texture_indices = (const int *) pointerFromLive2d(proxy, live2dGetDrawableTextureIndices(proxy->live2d_model));
     proxy->renpy_drawable_draw_orders = (const int *) pointerFromLive2d(proxy, live2dGetDrawableDrawOrders(proxy->live2d_model));
-    proxy->renpy_render_orders = (const int *) pointerFromLive2d(proxy, live2dGetDrawableRenderOrders(proxy->live2d_model));
+    proxy->renpy_render_orders = (const int *) pointerFromLive2d(proxy, live2dGetRenderOrders(proxy->live2d_model));
     proxy->renpy_drawable_opacities = (const float *) pointerFromLive2d(proxy, live2dGetDrawableOpacities(proxy->live2d_model));
     proxy->renpy_drawable_mask_counts = (const int *) pointerFromLive2d(proxy, live2dGetDrawableMaskCounts(proxy->live2d_model));
     proxy->renpy_drawable_masks = (const int **) pointerListFromLive2d(proxy, live2dGetDrawableMasks(proxy->live2d_model), proxy->drawable_count);
