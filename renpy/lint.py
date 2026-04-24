@@ -968,10 +968,14 @@ def check_unreachables(all_nodes):
             weakly_reachable.add(node)
 
         elif isinstance(node, (Translate, TranslateSay)):
-            # If a block with missing id exists, it is orpahn translation.
+            # If a block with missing id exists, it is an orphan translation.
             # We don't report it there, but later in the lint.
             if node.language is not None:
                 weakly_reachable.add(node)
+
+                if isinstance(node, Translate):
+                    for n in node.block:
+                        weakly_reachable.add(n)
 
         elif isinstance(node, (Return, EndTranslate)):
             weakly_reachable.add(node)
