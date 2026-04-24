@@ -928,6 +928,7 @@ def check_unreachables(all_nodes):
         TranslateSay,
         Return,
         EndTranslate,
+        Testcase,
         RPY,
     )
 
@@ -1006,6 +1007,10 @@ def check_unreachables(all_nodes):
 
                 if node in unreachable:
                     to_check.append(node)
+
+
+        elif isinstance(node, Testcase):
+            weakly_reachable.add(node)
 
         elif isinstance(node, RPY):
             weakly_reachable.add(node)
