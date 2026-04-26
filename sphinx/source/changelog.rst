@@ -75,7 +75,7 @@ Ren'Py now supports and requires Live2D 5.3. You may need to update Live2D to co
 Ren'Py Stores as Python Packages
 --------------------------------
 
-Ren'Py now treats Ren'Py stores as Python packages, as was documented by not implemented. This means imports can
+Ren'Py now treats Ren'Py stores as Python packages, as was documented but not implemented. This means imports can
 work from other stores. For example::
 
   init python in store.substore1
@@ -92,10 +92,10 @@ Note that such imports assign names, but do not create aliases. Updating A in th
 value in substore1, and vice versa.
 
 
-Parse Error Limitations
------------------------
+Parse Error Improvements
+------------------------
 
-Parse errors now reported at the end of each priority level (libs, then the game, then mods). Within a priority level,
+Parse errors are now reported at the end of each priority level (libs, then the game, then mods). Within a priority level,
 parse errors in filenames that begin with a number (like 01statement.rpy or 01lib/statement.rpy) are reported before parse
 errors in files that begin with letters.
 
@@ -107,7 +107,19 @@ easily identify and fix problems with their creator-defined statements.
 Fixes and Changes
 -----------------
 
-The value if :var:`mouse_visible` is now properly restored when exiting the game menu.
+An issue that could cause Ren'Py to corrupt data in a very specific case has been fixed. The issue would occur when
+a Python ``finally`` or ``except`` block would run as the stack was unwound after a load, and it would restore old data
+inappropriately. This is an unlikely error, but could happen in Python-heavy games.
+
+Several low-probability crashes and memory leaks have been fixed.
+
+Anisotropy is now disabled when nearest_neighbor sampling is used, preventing blurriness.
+
+The default value of the `synchro_start` parameter to :func:`renpy.audio.register_channel`, which controls if music
+waits for queued music on other channels to be played, is now the default loop value of the channel, in all
+cases.
+
+The value of :var:`mouse_visible` is now properly restored when exiting the game menu.
 
 The say behavior (used by dialogue) no longer lets you dismiss dialogue if the screen is grabbed by another
 displayable, such as a viewport being dragged.
@@ -115,11 +127,19 @@ displayable, such as a viewport being dragged.
 The :ref:`camera <camera>` statement is now documented to propagate transform state. (This was always true,
 but was not documented.)
 
-Nestled and nestled-close click-to-continue indicators are now rendered at 0 width in all circumstances. This prevents
-a class of issues that could occur when with NVL-mode, retained bubbles, and other configurations. This is equivalent to
-to rendering the text without a click-to-continue indicator, and then placing the CTC indicator next to the end of the
-rendered text. (This is is similar how {w}, {p}, and extend were already handled.)
+The nestled and nestled-close click-to-continue indicators now detect and respect RTL languages.
 
+Nestled and nestled-close click-to-continue indicators are now rendered at 0 width in all circumstances. This prevents
+a class of issues that could occur with NVL-mode, retained bubbles, and other configurations. This is equivalent to
+rendering the text without a click-to-continue indicator, and then placing the CTC indicator next to the end of the
+rendered text. (This is similar to how {w}, {p}, and extend were already handled.)
+
+Translations
+------------
+
+An Italian translation of the Ren'Py tutorial has been added.
+
+The Persian translation of the Ren'Py tutorial has been updated.
 
 Features
 --------
@@ -130,7 +150,7 @@ games that need to force the mouse to be shown for minigame purposes.
 Support has been added for a system-installed copy of the VSCodium text editor. This is a libre build of the
 same source code that makes Visual Studio Code.
 
-Add the Transform.unique() method, which marks a transform as unique. This prevents the transform from being
+The Transform.unique() method has been added, which marks a transform as unique. This prevents the transform from being
 copied when added to a displayable, which allows the transform to maintain state across multiple uses, or be
 referenced from outside its function argument.
 
