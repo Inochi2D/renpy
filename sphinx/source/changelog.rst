@@ -107,6 +107,8 @@ easily identify and fix problems with their creator-defined statements.
 Fixes and Changes
 -----------------
 
+The new :var:`config.say_menu_text_filters` list of functions supplements the existing :var:`config.say_menu_text_filter` function.
+
 An issue that could cause Ren'Py to corrupt data in a very specific case has been fixed. The issue would occur when
 a Python ``finally`` or ``except`` block would run as the stack was unwound after a load, and it would restore old data
 inappropriately. This is an unlikely error, but could happen in Python-heavy games.

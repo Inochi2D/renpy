@@ -1818,7 +1818,7 @@ Text and Fonts
             return s
         config.replace_text = replace_text
 
-    .. seealso:: :var:`config.say_menu_text_filter`
+    .. seealso:: :var:`config.say_menu_text_filters`
 
 .. var:: config.safe_text = ...
 
@@ -1826,14 +1826,14 @@ Text and Fonts
     If False, Ren'Py will raise an error when such text is encountered. This defaults to True in released games, and
     False in developer mode.
 
-.. var:: config.say_menu_text_filter = None
+.. var:: config.say_menu_text_filters = [ ]
 
-    If not None, then this is a function that is given the text found
+    A list of functions that are given the text found
     in strings in the :ref:`say <say-statement>` and :doc:`menu
-    <menus>` statements. It is expected to return new
+    <menus>` statements. Each is expected to return new
     (or the same) strings to replace them.
 
-    This runs very early in the say and menu statement processing, before
+    These run very early in the say and menu statement processing, before
     translation and substitutions are applied. For a filter that runs later,
     see :var:`config.replace_text`.
 

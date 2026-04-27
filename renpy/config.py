@@ -365,6 +365,7 @@ missing_image_callback = None
 
 # Called to filter text in the say and menu statements.
 say_menu_text_filter = None
+say_menu_text_filters = []
 
 # Used to replace one label with another.
 label_overrides = {}
