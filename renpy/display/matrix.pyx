@@ -815,6 +815,28 @@ cdef class Matrix2D(Matrix):
         self.zdz = 1.0
         self.wdw = 1.0
 
+
+cdef class MatrixStack(Matrix):
+    """
+    This class represents a stack of matrices. Call the .get_child method to get a matrix intiialized to this matrix.
+    The same child will be reinitialized and returned with each call to .get_child.
+    """
+
+    def __cinit__(self):
+        self.child = None
+
+    cdef MatrixStack get_child(self):
+        """
+        Returns the child of this matrix, initialized to self.
+        """
+
+        if self.child is None:
+            self.child = MatrixStack(self)
+
+        self.child.ctake(self)
+        return self.child
+
+
 cdef Matrix IDENTITY_MATRIX = Matrix([1.0, 0.0, 0.0, 1.0])
 IDENTITY = IDENTITY_MATRIX
 

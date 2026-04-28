@@ -115,3 +115,8 @@ cdef class Matrix:
 
 cdef class Matrix2D(Matrix):
     pass
+
+cdef class MatrixStack(Matrix):
+    cdef MatrixStack child
+
+    cdef MatrixStack get_child(self)
