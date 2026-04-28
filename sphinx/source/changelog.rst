@@ -6158,6 +6158,9 @@ being displayed.
 Changes
 -------
 
+It is now possible to customize the ``touch_keyboard`` screen to put
+it on any layer.
+
 The old tutorial and old templates are no longer included with Ren'Py.
 They can still be used with new version of Ren'Py if copied into
 this or later versions.

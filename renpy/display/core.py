@@ -2064,7 +2064,7 @@ class Interface:
         if self.text_rect is not None:
             not_shown = pygame.key.has_screen_keyboard_support() and not pygame.key.is_screen_keyboard_shown()
             if self.touch_keyboard:
-                not_shown = renpy.exports.get_screen("_touch_keyboard", layer="screens") is None
+                not_shown = renpy.exports.get_screen("_touch_keyboard") is None
 
             if self.old_text_rect != self.text_rect:
                 x, y, w, h = self.text_rect
@@ -2081,7 +2081,6 @@ class Interface:
                     renpy.exports.restart_interaction()  # required in mobile mode
                     renpy.exports.show_screen(
                         "_touch_keyboard",
-                        _layer="screens",  # not 'transient' so as to be above other screens
                         # not 'overlay' as it conflicts with console
                         _transient=True,
                     )
@@ -2092,7 +2091,7 @@ class Interface:
                 pygame.key.set_text_input_rect(None)
 
                 if self.touch_keyboard:
-                    renpy.exports.hide_screen("_touch_keyboard", layer="screens")
+                    renpy.exports.hide_screen("_touch_keyboard")
 
         self.old_text_rect = self.text_rect
 
