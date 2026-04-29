@@ -1364,6 +1364,27 @@ class If(Node):
         return None
 
 
+class While(Node):
+
+    def __init__(self, loc: NodeLocation, condition: Condition,block):
+        Node.__init__(self,loc)
+        
+        self.condition = condition
+        self.block = block
+
+    def chain(self,next):
+        self.next = next
+    
+    def execute(self, state, t):
+        if self.condition.ready():
+            self.block.chain(self)
+            next_node(self.block.block[0])
+            return None
+        
+        next_node(self.next)
+        return None
+
+
 class Python(Node):
     __slots__ = ("source", "hide")
 
