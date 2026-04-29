@@ -107,6 +107,19 @@ def pass_statement(l: Lexer, loc: NodeLocation) -> testast.Pass:
     return testast.Pass(loc)
 
 
+@test_statement("while")
+def while_statement(l: Lexer, loc: NodeLocation) -> testast.While:
+
+    condition = parse_condition(l, loc)
+    l.require(":")
+    l.expect_eol()
+    l.expect_block("while statement")
+    block, _ = parse_block(l.subblock_lexer(False), loc)
+
+    l.advance()
+    return testast.While(loc, condition, block)
+
+
 ##############################################################################
 # Statement functions: Actions
 
