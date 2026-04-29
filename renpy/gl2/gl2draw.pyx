@@ -1163,7 +1163,9 @@ cdef class GL2Draw:
 
         if isinstance(what, Surface):
             what = self.load_texture(what)
-            self.load_all_textures(what)
+
+            texture_transform = MatrixStack([self.draw_per_virt, 0, 0, self.draw_per_virt])
+            self.load_all_textures(what, texture_transform)
 
         if isinstance(what, Texture):
             if need_mipmap:
@@ -1189,7 +1191,9 @@ cdef class GL2Draw:
         """
 
         # Load all the textures and RTTs.
-        self.load_all_textures(what)
+
+        texture_transform = MatrixStack([self.draw_per_virt, 0, 0, self.draw_per_virt])
+        self.load_all_textures(what, texture_transform)
 
         # Switch to the right FBO, and the right viewport.
         self.change_fbo(self.fbo_1px)
