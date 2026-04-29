@@ -831,7 +831,7 @@ cdef class MatrixStack(Matrix):
         """
 
         if self.child is None:
-            self.child = MatrixStack(self)
+            self.child = MatrixStack(None)
 
         self.child.ctake(self)
         return self.child

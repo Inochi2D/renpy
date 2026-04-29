@@ -1010,7 +1010,7 @@ cdef class GL2Draw:
         if surf is None:
             return
 
-        texture_transform = MatrixStack([self.draw_per_virt, 0, 0, self.draw_per_virt])
+        texture_transform = MatrixStack([1, 0, 0, 1])
 
         # Load all the textures and RTTs.
         self.load_all_textures(surf, texture_transform)
@@ -1088,7 +1088,8 @@ cdef class GL2Draw:
 
         r.loaded = True
 
-        reverse = reverse.inplace_multiply(r.reverse)
+        if r.reverse is not None:
+            reverse = reverse.get_child().inplace_multiply(r.reverse)
 
         # Load the child textures.
         # This needs to be outside of r.mesh, as it handles all uniform texture loading,
@@ -1126,8 +1127,11 @@ cdef class GL2Draw:
                 r.shaders,
                 uniforms)
 
+            tx, ty = reverse.transform(1, 1)
+            oversample = math.hypot(tx, ty) / math.hypot(1, 1)
+
             for i, c in enumerate(r.children):
-                model.set_texture(i, self.render_to_texture(c[0], properties=r.properties))
+                model.set_texture(i, self.render_to_texture(c[0], properties=r.properties, oversample=oversample))
 
             if r.mesh is True:
                 tex = model.get_texture(0)
@@ -1149,7 +1153,7 @@ cdef class GL2Draw:
                     self.load_all_textures(v, reverse)
                     self.render_to_texture(v, properties=r.properties)
 
-    def render_to_texture(self, what, alpha=True, properties={}):
+    def render_to_texture(self, what, alpha=True, properties={}, oversample=1.0):
         """
         Renders `what` to a texture. The texture will have the drawable
         size of `what`.
@@ -1164,7 +1168,7 @@ cdef class GL2Draw:
         if isinstance(what, Surface):
             what = self.load_texture(what)
 
-            texture_transform = MatrixStack([self.draw_per_virt, 0, 0, self.draw_per_virt])
+            texture_transform = MatrixStack([1, 0, 0, 1])
             self.load_all_textures(what, texture_transform)
 
         if isinstance(what, Texture):
@@ -1177,7 +1181,7 @@ cdef class GL2Draw:
                 what.cached_texture.add_mipmap()
             return what.cached_texture
 
-        rv = self.texture_loader.render_to_texture(what, properties)
+        rv = self.texture_loader.render_to_texture(what, properties, oversample)
         what.cached_texture = rv
 
         return rv
@@ -1192,7 +1196,7 @@ cdef class GL2Draw:
 
         # Load all the textures and RTTs.
 
-        texture_transform = MatrixStack([self.draw_per_virt, 0, 0, self.draw_per_virt])
+        texture_transform = MatrixStack([1, 0, 0, 1])
         self.load_all_textures(what, texture_transform)
 
         # Switch to the right FBO, and the right viewport.
