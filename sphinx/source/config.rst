@@ -382,6 +382,12 @@ Display
     performance test. This image will be shown for 5 frames or .25
     seconds, on startup. It will then be automatically hidden.
 
+.. var:: config.mesh_oversample = 1.0
+
+    Determines how much mesh textures can be oversampled by. This, in turn, controls the maximum
+    amount a mesh can be scaled up by before it introduces additional blurriness, at the risk of
+    creating excessive large textures when a mesh is scaled up greatly.
+
 .. var:: config.minimum_presplash_time = 0.0
 
     The minimum amount of time, in seconds, a presplash, Android presplash,

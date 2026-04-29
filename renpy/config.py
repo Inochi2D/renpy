@@ -1589,6 +1589,11 @@ mesh_pad_compat: bool = False
 Should mesh pad work the way it did before 8.4? (That is, it shifts things to the right/down by pad_left/pad_top.)
 """
 
+mesh_oversample: float = 1.0
+"""
+Determines how much mesh textures can be oversampled by. This, in turn, controls the maximum amount a mesh can be scaled up by before it introduces additional blurriness.
+"""
+
 emscripten_preload_timeout: float|None = 5.0
 """
 After this many second without being able to preload, the emscripten port will cause a preload even if doing

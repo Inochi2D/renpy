@@ -107,6 +107,10 @@ easily identify and fix problems with their creator-defined statements.
 Fixes and Changes
 -----------------
 
+The new :var:`config.mesh_oversample` variable can be configured to control how much a mesh texture can be oversampled
+by, preventing additional blurriness when scaled up. This defaults to 1.0 (disabled) in this version, but this will
+change in Ren'Py 8.6.
+
 The new :var:`config.say_menu_text_filters` list of functions supplements the existing :var:`config.say_menu_text_filter` function.
 
 An issue that could cause Ren'Py to corrupt data in a very specific case has been fixed. The issue would occur when
