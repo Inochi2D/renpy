@@ -26,7 +26,6 @@ the omission in future versions.
 * Aliengeo
 * Alisha Taylor
 * Altskop
-* Andrej
 * Andrí Wilford
 * Andy_kl
 * Apricotorange
@@ -77,6 +76,7 @@ the omission in future versions.
 * Denys
 * Denzil
 * Derik
+* Devon Lewis
 * Diapolo10
 * DinakiS
 * Dipesh Aggarwal
@@ -159,6 +159,7 @@ the omission in future versions.
 * Joshua Stone
 * Julian Uy
 * Julvenzor
+* juperMonkey
 * Jürg Billeter
 * KagariSoft-Dev
 * Kalawore
@@ -187,6 +188,7 @@ the omission in future versions.
 * Loliconazter
 * Liu Wenyuan
 * Lore
+* loviuz
 * Lucas Ramage
 * Luejerry
 * M-From-Space
@@ -261,12 +263,15 @@ the omission in future versions.
 * Ria-kon
 * Ricardo Pérez
 * Rikxz
+* River
 * rivvil
 * Robert Penner
 * Roope Herpiö
-* Saamkhaih Kyakya
+* Rose20
+* Ruben Jesus Garcia-Hernandez
 * SahabandhSthabara
 * Saltome
+* Sammkhaik Kyakya
 * Sandra "Maxi" Molina
 * Sapphi
 * Scout
@@ -292,6 +297,7 @@ the omission in future versions.
 * Tlm-2501
 * Tmrwiz
 * Totally a booplicate
+* Ulysses Zhan
 * Vadim Karpenko
 * Valery Iwanofu
 * Veydzh3r
