@@ -107,6 +107,8 @@ easily identify and fix problems with their creator-defined statements.
 Fixes and Changes
 -----------------
 
+Automatic detection of language on macOS should work in more situations.
+
 The new :var:`config.mesh_oversample` variable can be configured to control how much a mesh texture can be oversampled
 by, preventing additional blurriness when scaled up. This defaults to 1.0 (disabled) in this version, but this will
 change in Ren'Py 8.6.
