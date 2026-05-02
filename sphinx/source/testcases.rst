@@ -1245,6 +1245,21 @@ This timeout temporarily overrides the global ``_test.timeout`` setting.
 
     skip until screen "inventory" timeout 20.0
 
+While
+^^^^^^^^^
+
+    Type: :dfn:`Control`
+
+    .. describe:: while <condition>
+
+This statement executes a block of test statements while the provided
+condition remains met.
+
+Example::
+
+    while eval shouldAdvance:
+        advance
+        $ shouldAdvance = some_evaluation_function()
 
 Python Blocks And Dollar-Lines
 ------------------------------
