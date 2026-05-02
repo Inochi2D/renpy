@@ -16,6 +16,7 @@ dependencies = [
     "sphinx",
     "sphinx_rtd_theme",
     "sphinx_rtd_dark_mode",
+    "sphinx-tabs",
     "jinja2",
     "pkgconfig>=1.6.0",
 ]
